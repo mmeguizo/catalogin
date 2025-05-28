@@ -35,7 +35,8 @@ const NAVIGATION: Navigation = [
 const BRANDING = {
   title: "Library System",
   logo : (
-    <img src="../../../logo.png" alt="CHMSU LOGO" className="logo-image" style={{ height: "20vh" }}  />
+    // <img src="../../../logo.png" alt="CHMSU LOGO" className="logo-image" style={{ height: "20vh" }}  />
+    <img src="/logo.png" alt="CHMSU LOGO" className="logo-image" style={{ height: "20vh" }}  />
   )
 };
 
