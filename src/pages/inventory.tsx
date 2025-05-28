@@ -1,4 +1,4 @@
-// pages/inventory.tsx
+// src/pages/inventory.tsx
 import * as React from "react";
 import {
   CircularProgress,
@@ -12,69 +12,42 @@ import {
   MenuItem,
 } from "@mui/material";
 import PrintIcon from '@mui/icons-material/Print';
-import { DataGrid, GridToolbar } from "@mui/x-data-grid";
+import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import { PageContainer } from "@toolpad/core/PageContainer";
 import { booksDataSource, Book } from '../data/book';
 import PrintCardDialog from '../components/PrintCardDialog';
 
 export default function InventoryPage() {
-  console.log('InventoryPage: Component Render');
-
   const [books, setBooks] = React.useState<Book[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<Error | null>(null);
   const [rowCount, setRowCount] = React.useState(0);
 
-  // State for the print menu and dialog
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [selectedBookForPrint, setSelectedBookForPrint] = React.useState<Book | null>(null);
   const [cardTypeToPrint, setCardTypeToPrint] = React.useState<string>('');
   const [openPrintDialog, setOpenPrintDialog] = React.useState(false);
 
-  // --- DEBUG LOGS FOR PRINT STATE ---
-  React.useEffect(() => {
-    console.log('--- Print State Update ---');
-    console.log('anchorEl:', anchorEl);
-    console.log('selectedBookForPrint:', selectedBookForPrint ? selectedBookForPrint.id : 'null');
-    console.log('cardTypeToPrint:', cardTypeToPrint);
-    console.log('openPrintDialog:', openPrintDialog);
-    console.log('--------------------------');
-  }, [anchorEl, selectedBookForPrint, cardTypeToPrint, openPrintDialog]);
-  // --- END DEBUG LOGS ---
-
-
-  // Handlers for the print menu
   const handlePrintMenuClick = React.useCallback((event: React.MouseEvent<HTMLElement>, book: Book) => {
-    console.log('handlePrintMenuClick: Clicked print icon for book ID:', book.id);
     setAnchorEl(event.currentTarget);
     setSelectedBookForPrint(book);
-  }, []); // Memoize for useCallback dependency
+  }, []);
 
   const handlePrintMenuClose = React.useCallback(() => {
-    console.log('handlePrintMenuClose: Closing print menu');
     setAnchorEl(null);
-    // Important: Do NOT reset selectedBookForPrint or cardTypeToPrint here,
-    // as they are needed by the dialog right after selection.
-    // They should only be reset when the dialog itself closes.
   }, []);
 
-  // Handler for selecting a card type from the menu
   const handleCardTypeSelect = React.useCallback((type: string) => {
-    console.log('handleCardTypeSelect: Selected card type:', type);
     setCardTypeToPrint(type);
     setOpenPrintDialog(true);
-    // Menu is closed here, but states for dialog should persist
-    setAnchorEl(null); // Close the menu immediately
+    setAnchorEl(null);
   }, []);
 
-  // Handler for closing the print dialog
   const handleClosePrintDialog = React.useCallback(() => {
-    console.log('handleClosePrintDialog: Closing print dialog');
     setOpenPrintDialog(false);
-    setSelectedBookForPrint(null); // Reset book data when dialog closes
-    setCardTypeToPrint(''); // Reset card type when dialog closes
+    setSelectedBookForPrint(null);
+    setCardTypeToPrint('');
   }, []);
-
 
   React.useEffect(() => {
     const fetchBooks = async () => {
@@ -130,23 +103,83 @@ export default function InventoryPage() {
         date_added: dateAddedFormatted,
         remarks: book.remarks,
         ddc: book.ddc,
+        // NEW FIELDS - ensure they are explicitly mapped if needed, though spread should work
+        Accession_Number: book.Accession_Number,
+        Title_Number: book.Title_Number,
+        Title: book.Title,
+        Author: book.Author,
+        Author1_FirstName: book.Author1_FirstName,
+        Author2_Surname: book.Author2_Surname,
+        Author2_FirstName: book.Author2_FirstName,
+        Author3_Surname: book.Author3_Surname,
+        Author3_FirstName: book.Author3_FirstName,
+        Author4_Surname: book.Author4_Surname,
+        Author4_FirstName: book.Author4_FirstName,
+        Other_Authors: book.Other_Authors,
+        Publisher: book.Publisher,
+        Prelim_page: book.Prelim_page,
+        Pages: book.Pages,
+        Description: book.Description,
+        dimension: book.dimension,
+        Accompanying_materials: book.Accompanying_materials,
+        ISBN: book.ISBN,
+        Material_Type: book.Material_Type,
+        Subtype: book.Subtype,
+        General_Subject: book.General_Subject,
+        Course_Code1: book.Course_Code1,
+        Course_Code2: book.Course_Code2,
+        Course_Code3: book.Course_Code3,
+        Course_Code4: book.Course_Code4,
+        Course_Code5: book.Course_Code5,
+        Department: book.Department,
+        Location: book.Location,
       };
     });
     return mappedRows;
   }, [books]);
 
   const columns = React.useMemo(() => {
+    // UPDATED: manualWidths to include all new columns
     const manualWidths: { [key: string]: number } = {
-      id: 250,
-      class_number: 100,
-      author_notation: 100,
+      id: 100, // Adjusted ID width
+      class_number: 120,
+      author_notation: 120,
       copyright_year: 100,
-      copy: 50,
+      copy: 60,
       ris_number: 100,
-      date_added: 150,
-      remarks: 150,
-      ddc: 100,
-      print_actions: 100,
+      date_added: 140,
+      remarks: 180,
+      ddc: 80,
+      Accession_Number: 150,
+      Title_Number: 120,
+      Title: 250,
+      Author: 180,
+      Author1_FirstName: 120,
+      Author2_Surname: 120,
+      Author2_FirstName: 120,
+      Author3_Surname: 120,
+      Author3_FirstName: 120,
+      Author4_Surname: 120,
+      Author4_FirstName: 120,
+      Other_Authors: 180,
+      Publisher: 150,
+      Prelim_page: 80,
+      Pages: 80,
+      Description: 200,
+      dimension: 100,
+      Accompanying_materials: 180,
+      ISBN: 140,
+      Material_Type: 120,
+      Subtype: 120,
+      General_Subject: 150,
+      Course_Code1: 120,
+      Course_Code2: 120,
+      Course_Code3: 120,
+      Course_Code4: 120,
+      Course_Code5: 120,
+      Department: 100,
+      Location: 100,
+      print_actions: 80, // Width for the new print column
     };
 
     const baseColumns = booksDataSource.fields.map((field) => {
@@ -229,7 +262,6 @@ export default function InventoryPage() {
         </Paper>
       </Stack>
 
-      {/* Print Menu */}
       <Menu
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
@@ -240,7 +272,6 @@ export default function InventoryPage() {
         <MenuItem onClick={() => handleCardTypeSelect('Subject Card')}>Subject Card</MenuItem>
       </Menu>
 
-      {/* Print Card Dialog */}
       {selectedBookForPrint && openPrintDialog && (
         <PrintCardDialog
           open={openPrintDialog}

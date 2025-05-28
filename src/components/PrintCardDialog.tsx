@@ -1,7 +1,7 @@
 // src/components/PrintCardDialog.tsx
 import * as React from 'react';
-import * as ReactDOM from 'react-dom'; // Import ReactDOM
-import { // Keep all other necessary imports
+import * as ReactDOM from 'react-dom';
+import {
   Dialog,
   DialogTitle,
   DialogContent,
@@ -32,20 +32,35 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
     return null; // Don't render if no book data
   }
 
-  // Placeholder/Inferred Data
-  const inferredTitle = bookData.remarks || "Inferred Book Title";
-  const inferredAuthorFullName = bookData.author_notation || "Inferred Author Name";
-  const inferredPlaceOfPublication = "New York";
-  const inferredPhysicalDescription = "250 p. : ill. ; 23 cm.";
-  const inferredISBN = "978-0-1234-5678-9";
-  const inferredTracingSubjects = "1. FICTION. 2. ADVENTURE. 3. MYSTERY.";
+  // Use actual data from bookData, with fallbacks to empty string if not present
+  const bookTitle = bookData.Title || '';
+  const primaryAuthor = bookData.Author || bookData.author_notation || ''; // Use primary Author, fallback to notation
+  const publisher = bookData.Publisher || '';
+  const copyrightYear = bookData.copyright_year || '';
+  const pages = bookData.Pages || '';
+  const dimension = bookData.dimension || '';
+  const description = bookData.Description || '';
+  const accompanyingMaterials = bookData.Accompanying_materials || '';
+  const isbn = bookData.ISBN || '';
+  const generalSubject = bookData.General_Subject || '';
+  const remarks = bookData.remarks || '';
+
+  // For subjects, you might combine General_Subject and Course_Codes
+  const inferredTracingSubjects = [
+    generalSubject,
+    bookData.Course_Code1,
+    bookData.Course_Code2,
+    bookData.Course_Code3,
+    bookData.Course_Code4,
+    bookData.Course_Code5,
+  ].filter(Boolean).map((s, i) => `${i + 1}. ${s}`).join(' ');
+
 
   // Refined card dimensions for better preview and print
   const CARD_WIDTH_PX = 360; // 12.5cm * ~28.35 px/cm
   const CARD_HEIGHT_PX = 210; // 7.5cm * ~28.35 px/cm
 
   const renderCardContent = () => {
-    // FIX: Wrap commonElements in a React Fragment
     const commonElements = (
       <React.Fragment>
         <Typography variant="body2" sx={{ position: 'absolute', top: 8, left: 8, fontSize: '0.85rem' }}>
@@ -68,10 +83,9 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
 
     console.log('PrintCardDialog: Rendering card content for type:', cardType);
 
-    // FIX: Apply ID for print-only targeting here directly on the Paper
     return (
       <Paper
-        id="print-card-content" // Add an ID for targeting with CSS
+        id="print-card-content"
         elevation={1}
         sx={{
           p: 2,
@@ -81,55 +95,65 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
           position: 'relative',
           overflow: 'hidden',
           fontSize: '0.85rem',
-          // Ensure these styles are consistently applied for both preview and print
         }}
       >
         {commonElements}
         {cardType === 'Author Card' && (
           <Typography variant="body1" sx={{ mt: 1, ml: 5, fontWeight: 'bold', fontSize: '0.9rem' }}>
-            {inferredAuthorFullName}
+            {primaryAuthor}
           </Typography>
         )}
         {cardType === 'Title Card' && (
           <Typography variant="body1" sx={{ mt: 1, ml: 5, fontWeight: 'bold', fontSize: '0.9rem' }}>
-            {inferredTitle}
+            {bookTitle}
           </Typography>
         )}
         {cardType === 'Subject Card' && (
           <Typography variant="body1" sx={{ mt: 1, ml: 5, fontWeight: 'bold', fontSize: '0.9rem' }}>
-            {inferredTracingSubjects.split('.')[0].trim()}
+            {generalSubject || inferredTracingSubjects.split('.')[0].trim()} {/* Use general subject if available */}
           </Typography>
         )}
+
+        {/* Main content for all cards */}
         <Typography variant="body2" sx={{ mt: 0.5, ml: 5, fontSize: '0.85rem' }}>
-          {inferredTitle} / {inferredAuthorFullName}. - {inferredPlaceOfPublication} : {bookData.copyright_year}.
+          {bookTitle} / {primaryAuthor}. - {publisher} : {copyrightYear}.
         </Typography>
         <Typography variant="body2" sx={{ mt: 0.5, ml: 5, fontSize: '0.85rem' }}>
-          {inferredPhysicalDescription}
+          {pages} : {description} ; {dimension}.
         </Typography>
-        <Typography variant="body2" sx={{ mt: 0.5, ml: 5, fontSize: '0.85rem' }}>
-          Notes: {bookData.remarks}
-        </Typography>
-        <Typography variant="body2" sx={{ mt: 0.5, ml: 5, fontSize: '0.85rem' }}>
-          ISBN: {inferredISBN}
-        </Typography>
-        <Typography variant="body2" sx={{ mt: 0.5, ml: 5, fontSize: '0.85rem' }}>
-          1. {inferredTracingSubjects}
-        </Typography>
+        {accompanyingMaterials && (
+          <Typography variant="body2" sx={{ mt: 0.5, ml: 5, fontSize: '0.85rem' }}>
+            Accompanying materials: {accompanyingMaterials}.
+          </Typography>
+        )}
+        {isbn && (
+          <Typography variant="body2" sx={{ mt: 0.5, ml: 5, fontSize: '0.85rem' }}>
+            ISBN: {isbn}.
+          </Typography>
+        )}
+        {remarks && (
+          <Typography variant="body2" sx={{ mt: 0.5, ml: 5, fontSize: '0.85rem' }}>
+            Notes: {remarks}.
+          </Typography>
+        )}
+        {inferredTracingSubjects && (
+          <Typography variant="body2" sx={{ mt: 0.5, ml: 5, fontSize: '0.85rem' }}>
+            {inferredTracingSubjects}
+          </Typography>
+        )}
       </Paper>
     );
   };
 
-  // Get the print portal root element
   const printPortalRoot = document.getElementById('print-portal-root');
 
   return (
     <>
-      {/* Dialog for preview (hidden on print) */}
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth className="no-print-dialog">
         <DialogTitle>Print {cardType}</DialogTitle>
         <DialogContent dividers>
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-            {renderCardContent()} {/* Render card content for modal preview */}
+            {renderCardContent()}
           </Box>
         </DialogContent>
         <DialogActions>
@@ -138,7 +162,6 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
         </DialogActions>
       </Dialog>
 
-      {/* Render the card content into the print portal only when the dialog is open */}
       {open && printPortalRoot && ReactDOM.createPortal(
         <div className="print-only-container">
           {renderCardContent()}
@@ -146,33 +169,31 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
         printPortalRoot
       )}
 
-      {/* NEW: Add a style block for print-specific CSS */}
       <style jsx global>{`
-        /* Hide everything by default when printing */
         @media print {
-          /* Hide the main app root */
-          #root {
+          body > #root,
+          body > .MuiDialog-root,
+          body > .MuiBackdrop-root,
+          body > .no-print-dialog {
             display: none !important;
           }
 
-          /* Hide the dialog root (if it's not portal-rendered) */
-          .MuiDialog-root, .MuiBackdrop-root, .no-print-dialog {
-              display: none !important;
-          }
-
-          /* Show only the content rendered in the print portal */
           #print-portal-root {
-            display: block !important; /* Ensure the portal root is visible */
-            width: 100%;
+            display: block !important;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
             height: 100vh;
             margin: 0;
             padding: 0;
-            overflow: hidden; /* Prevent scrollbars */
-            box-sizing: border-box; /* Include padding/border in total width/height */
+            overflow: hidden;
+            box-sizing: border-box;
+            z-index: 9999;
           }
 
           .print-only-container {
-            display: flex !important; /* Use flexbox to center the card */
+            display: flex !important;
             justify-content: center;
             align-items: center;
             width: 100%;
@@ -181,16 +202,10 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
             padding: 0;
           }
 
-          /* Ensure the card itself is at the correct size and position */
           #print-card-content {
-            margin: 0; /* Remove any default margins */
-            padding: 0; /* Remove default padding */
-         
-          
-            
-            /* Add fine-tuning for position if needed, e.g., for sticker alignment */
-            /* For example, for a top-left sticker on a page: */
-            /* position: absolute; top: 1cm; left: 1cm; */
+            margin: 0;
+            padding: 0;
+            box-shadow: none !important;
           }
         }
       `}</style>
@@ -199,5 +214,3 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
 };
 
 export default PrintCardDialog;
-  // border: none !important; /* Remove border on print if desired */
-//     box-shadow: none !important; /* Remove shadow on print */
