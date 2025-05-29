@@ -47,152 +47,234 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
   const copy = bookData.copy || '';
   const location = bookData.Location || 'CY';
 
-  // Format: "Vii, 306 pages : some illustrations ; 25cm. + 1 CD ROM."
-  const collationLine = [
-    prelimPage ? `${prelimPage},` : '',
-    pages ? `${pages} pages :` : '',
-    description ? `${description} ;` : '',
-    dimension ? `${dimension}.` : '',
-    accompanyingMaterials ? `+ ${accompanyingMaterials}.` : ''
-  ].filter(Boolean).join(' ').replace(/, :/, ':');
+  // --- Refined: Collation Line Construction ---
+  const collationParts = [];
+  if (prelimPage && pages) {
+      collationParts.push(`${prelimPage}, ${pages} pages`);
+  } else if (pages) {
+      collationParts.push(`${pages} pages`);
+  }
+  if (description) {
+      collationParts.push(`: ${description}`);
+  }
+  if (dimension) {
+      collationParts.push(`; ${dimension}cm.`);
+  }
+  if (accompanyingMaterials) {
+      collationParts.push(`+ ${accompanyingMaterials}.`);
+  }
+  const collationLine = collationParts.filter(Boolean).join(' ').trim();
 
-  const tracingSubjects = [
+  // --- Refined: Tracing Subjects Construction ---
+  const tracingSubjectsRaw = [
     generalSubject,
-    bookData.Course_Code1,
-    bookData.Course_Code2,
-    bookData.Course_Code3,
-    bookData.Course_Code4,
-    bookData.Course_Code5,
+    // bookData.Course_Code1,
+    // bookData.Course_Code2,
+    // bookData.Course_Code3,
+    // bookData.Course_Code4,
+    // bookData.Course_Code5,
   ].filter(Boolean);
 
-  const formattedTracingSubjects = tracingSubjects.length > 0
-    ? tracingSubjects.map((s, i) => `${i + 1}. ${s}`).join(' ') + '.'
+  const formattedTracingSubjects = tracingSubjectsRaw.length > 0
+    ? tracingSubjectsRaw.map((s, i) => `${i + 1}. ${s}`).join(' ') + '.'
     : '';
 
-  // --- ADJUSTED: Card dimensions ---
-  const CARD_WIDTH_PX = 600;
-  const CARD_HEIGHT_PX = 350;
+  // --- ADJUSTED: Card dimensions (use CM for precision) ---
+  const CARD_WIDTH_CM = 15.7; // 5 inches
+  const CARD_HEIGHT_CM = 7.62; // 3 inches
+
+  // --- ADJUSTED: Indentation Values (using cm for precision) ---
+  const indent0 = '0.3cm'; // Left-most margin for classification/accession info
+  const indent1 = '1.2cm'; // First significant text indent (for hanging indents start)
+  const indent2 = '1.1cm'; // Second significant text indent (for primary entry, and wrapped lines)
+
 
   const renderCardContent = () => {
-    // --- ADJUSTED: Common Left Column Style (for DDC, Class No., Author Notation) ---
-    const commonLeftColStyle = {
-      position: 'absolute',
-      left: '0.3cm', // Closer to left edge
-      fontSize: '0.8rem',
-      lineHeight: 1.2,
-    };
-
-    // --- ADJUSTED: Main Content Line Style (for Title, Author, Imprint, Collation etc.) ---
-    const mainContentLineStyle = {
-      ml: '2.5rem', // Indent content lines starting from 2.5rem (approx 0.88 inch or 2.2cm)
+    // --- Common Layout Styles ---
+    const lineBaseStyle = {
       fontSize: '0.9rem',
       lineHeight: 1.3,
       wordBreak: 'break-word',
+      mb: '0.1rem', // Small margin-bottom for vertical spacing between lines
     };
 
-    // --- ADJUSTED: Common Elements (Now includes bottom-left info) ---
-    const commonElements = (
-      <React.Fragment>
-        {/* Top Left Classification Info */}
-        <Typography variant="body2" sx={{ ...commonLeftColStyle, top: '0.3cm' }}>
-          {location}
-        </Typography>
-        <Typography variant="body2" sx={{ ...commonLeftColStyle, top: '0.9cm' }}>
-          {ddc}
-        </Typography>
-        <Typography variant="body2" sx={{ ...commonLeftColStyle, top: '1.5cm' }}>
-          {classNumber}
-        </Typography>
-        <Typography variant="body2" sx={{ ...commonLeftColStyle, top: '2.1cm' }}>
-          {authorNotation}
-        </Typography>
+    // Style for lines that require hanging indent
+    const hangingIndentStyle = {
+      ...lineBaseStyle,
+      ml: indent1, // Starts at first indent
+      textIndent: `-${parseFloat(indent2) - parseFloat(indent1)}cm`, // Negative indent for first line to align subsequent lines at indent2
+    };
 
-        {/* --- MOVED/ADJUSTED: Bottom-Left Accession/Title/RIS/Copy Info --- */}
-        <Box sx={{ position: 'absolute', bottom: '0.3cm', left: '0.3cm', fontSize: '0.75rem', lineHeight: 1.2 }}>
-            {accessionNumber && <Typography variant="body2" sx={{ fontSize: 'inherit' }}>Acc. #: {accessionNumber}</Typography>}
-            {titleNumber && <Typography variant="body2" sx={{ fontSize: 'inherit' }}>Title #: {titleNumber}</Typography>}
-            {risNumber && <Typography variant="body2" sx={{ fontSize: 'inherit' }}>RIS #: {risNumber}</Typography>}
-            {copy && <Typography variant="body2" sx={{ fontSize: 'inherit' }}>Copy: {copy}</Typography>}
-        </Box>
-      </React.Fragment>
-    );
+    const formattedTracingSubjectsStyle = {
+      ...lineBaseStyle,
+      ml: indent1, // Starts at first indent
+      mt: '30px',
+      textIndent: `-${parseFloat(indent2) - parseFloat(indent1)}cm`, // Negative indent for first line to align subsequent lines at indent2
+    }
+
+    const hangingIndentStyle2 = {
+      ...lineBaseStyle,
+      ml: indent1, // Starts at first indent
+      textIndent: `-${parseFloat(indent2) - parseFloat(indent1)}cm`, // Negative indent for first line to align subsequent lines at indent2
+    };
+
+    // Style for lines that require a deeper indent (like primary entry for Author Card)
+    const deepIndentStyle = {
+      ...lineBaseStyle,
+      ml: '15px', // Starts at second indent
+    };
 
     return (
       <Paper
         id="print-card-content"
         elevation={1}
         sx={{
-          p: '0.5cm',
+          p: '0.5cm', // Padding around the content inside the paper
           border: '1px solid #ccc',
-          width: CARD_WIDTH_PX,
-          height: CARD_HEIGHT_PX,
-          position: 'relative',
+          width: `${CARD_WIDTH_CM}cm`,
+          height: `${CARD_HEIGHT_CM}cm`,
+          position: 'relative', // Paper is the positioning context for its children
           overflow: 'hidden',
           fontFamily: 'monospace',
-          // REMOVED FOR PREVIEW BACKGROUND: color: 'black', backgroundColor: 'white',
+          color: 'black',
+          backgroundColor: 'inherit', // Inherit theme background for preview
+          display: 'flex', // Use flexbox for the main layout to align left and right boxes
+          flexDirection: 'row',
         }}
       >
-        {commonElements}
-
-        {/* --- ADJUSTED: Main Content Area Positioning --- */}
-        <Box sx={{ position: 'absolute', top: '2.8cm', left: '0.5cm', right: '0.5cm', bottom: '0.5cm', overflow: 'hidden' }}>
-          {/* Primary Entry Line - adjusted for bolding and specific card type */}
-          {cardType === 'Author Card' && (
-            <Typography variant="body1" sx={{ ...mainContentLineStyle, fontWeight: 'bold' }}>
-              {primaryAuthor}.
-            </Typography>
-          )}
-          {cardType === 'Title Card' && (
-            <Typography variant="body1" sx={{ ...mainContentLineStyle, fontWeight: 'bold' }}>
-              {bookTitle}.
-            </Typography>
-          )}
-          {cardType === 'Subject Card' && (
-            <Typography variant="body1" sx={{ ...mainContentLineStyle, fontWeight: 'bold', textTransform: 'uppercase' }}>
-              {generalSubject || (formattedTracingSubjects.split('.')[0] || '').trim()}.
-            </Typography>
-          )}
-
-          {/* --- ADJUSTED: Subsequent lines with correct indentation and conditional rendering --- */}
-          {/* Author line for Title/Subject cards */}
-          {cardType !== 'Author Card' && primaryAuthor && (
-            <Typography variant="body2" sx={{ ...mainContentLineStyle, ml: '2.5rem' }}>
-                {primaryAuthor}.
-            </Typography>
-          )}
-          
-          {/* Title and Imprint line */}
-          <Typography variant="body2" sx={{ ...mainContentLineStyle, ml: '2.5rem' }}>
-            {bookTitle} {bookTitle && primaryAuthor ? '/' : ''} {primaryAuthor}. -- {publisher}, {copyrightYear}.
+        {/* --- Left (Red Box equivalent) --- */}
+        <Box sx={{
+          width: '2.5cm', // Approximate width of the left column based on sample
+          height: '90%',
+          flexShrink: 0, // Prevent it from shrinking
+          // backgroundColor: 'rgba(255,0,0,0.2)', // For visual debugging
+          position: 'relative', // This box is a positioning context for its absolute children
+          pr: '0.1cm', // Small right padding to separate from green box
+          // borderRight: '1px dotted red' // For visual debugging
+        }}>
+          {/* Top Left Classification Info (relative to this red box) */}
+          <Typography variant="body2" sx={{ position: 'absolute', top: '0.0cm', left: '0cm', fontSize: '0.8rem', lineHeight: 1.2 }}>
+            &nbsp;{location}
           </Typography>
-          
-          {/* Collation line */}
-          {collationLine && (
-            <Typography variant="body2" sx={{ ...mainContentLineStyle, ml: '2.5rem' }}>
-              {collationLine}
-            </Typography>
-          )}
-          
-          {/* ISBN line */}
-          {isbn && (
-            <Typography variant="body2" sx={{ ...mainContentLineStyle, ml: '2.5rem' }}>
-              ISBN {isbn}.
-            </Typography>
-          )}
+          <Typography variant="body2" sx={{ position: 'absolute', top: '0.5cm', left: '0cm', fontSize: '0.8rem', lineHeight: 1.2 }}>
+            {ddc} {classNumber} {/* Combined DDC and Class Number */}
+          </Typography>
+          <Typography variant="body2" sx={{ position: 'absolute', top: '1cm', left: '0cm', fontSize: '0.8rem', lineHeight: 1.2 }}>
+            {authorNotation}
+          </Typography>
+          <Typography variant="body2" sx={{ position: 'absolute', top: '1.5cm', left: '0cm', fontSize: '0.8rem', lineHeight: 1.2 }}>
+            {copyrightYear}
+          </Typography>
 
-          {/* Remarks/Notes line */}
-          {remarks && (
-            <Typography variant="body2" sx={{ ...mainContentLineStyle, ml: '2.5rem' }}>
-              Notes: {remarks}.
-            </Typography>
-          )}
 
-          {/* Tracing Subjects line */}
-          {formattedTracingSubjects && (
-            <Typography variant="body2" sx={{ ...mainContentLineStyle, ml: '2.5rem' }}>
-              {formattedTracingSubjects}
-            </Typography>
-          )}
+          {/* Bottom-Left Accession/Title/RIS/Copy Info (relative to this red box) */}
+          <Box sx={{
+              position: 'absolute',
+              bottom: '0cm', // Position from bottom of this red box
+              left: '0cm',   // Align with classification left margin
+              fontSize: '0.75rem',
+              lineHeight: 1.2,
+          }}>
+              {accessionNumber && <Typography variant="body2" sx={{ fontSize: 'inherit', mb: '0.1rem' }}>Acc. #: {accessionNumber}</Typography>}
+              {titleNumber && <Typography variant="body2" sx={{ fontSize: 'inherit', mb: '0.1rem' }}>Title #: {titleNumber}</Typography>}
+              {risNumber && <Typography variant="body2" sx={{ fontSize: 'inherit', mb: '0.1rem' }}>RIS #: {risNumber}</Typography>}
+              {copy && <Typography variant="body2" sx={{ fontSize: 'inherit' }}>Copy: {copy}</Typography>}
+          </Box>
+        </Box>
+
+        {/* --- Right (Green Box equivalent): Main Bibliographic Content Area --- */}
+        <Box sx={{
+            flexGrow: 1, // Allow it to grow and fill remaining space
+            // backgroundColor: 'rgba(0,255,0,0.2)', // For visual debugging
+            pt: '0.1cm', // Padding top to align with author name in red box
+            pb: '0.1cm', // Padding bottom to ensure content doesn't hit the bottom edge
+            overflow: 'hidden', // Hide overflow if text goes too long
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-start',
+            alignItems: 'flex-start',
+        }}>
+            {/* --- Primary Entry (Authors, Title, or Subject) --- */}
+            {/* Positioned absolutely to align with the DDC/Class Number block (indent0) if card type is Title/Subject */}
+            {(cardType === 'Title Card' || cardType === 'Subject Card') && (
+              <Typography
+                variant="body1"
+                sx={{
+                  position: 'relative', // Absolute to align with indent0
+                  top: '12px',           // Top alignment within this green box
+                  left: '45px',        // Aligned with classification block
+                  fontSize: '0.9rem',
+                  lineHeight: 1.3,
+                  // fontWeight: 'bold',
+                  textTransform: cardType === 'Subject Card' ? 'uppercase' : 'none',
+                }}
+              >
+                {cardType === 'Title Card' ? bookTitle : (generalSubject)}.
+              </Typography>
+            )}
+
+            {/* --- Author/Title/Subject Main Entry (for Author Card) --- */}
+            {cardType === 'Author Card' && (
+              <Box sx={{ width: '100%', /* border: '1px dotted red', */ mb: '0.1cm', mt: '0.5cm' /* Aligns with top of green box */ }}>
+                  <Typography variant="body1" sx={{ ...deepIndentStyle, }}>
+                    {primaryAuthor}.
+                  </Typography>
+              </Box>
+            )}
+
+            {/* --- Author line for Title/Subject cards (starts at second indent if not primary entry) --- */}
+            {cardType !== 'Author Card' && primaryAuthor && (
+                <Box sx={{ width: '100%', /* border: '1px dotted blue', */ mb: '0.1cm', mt: '0.5cm' /* Space below primary entry */ }}>
+                    <Typography variant="body2" sx={{ ...deepIndentStyle }}>
+                        {primaryAuthor}.
+                    </Typography>
+                </Box>
+            )}
+            
+            {/* --- Main Bibliographic Description (Starts below dynamic primary entry/author line) --- */}
+            {/* Calculate top margin dynamically based on previous content to avoid overlap and align */}
+            <Box sx={{
+                width: '100%',
+                // border: '1px dotted purple',
+                flexGrow: 1,
+                mt: cardType === 'Author Card' ? '0.0cm' : (primaryAuthor ? '0.0cm' : '0.5cm'), /* Adjust top margin based on previous content */
+                // This box will now contain all the flowing lines starting from the Title Statement
+            }}>
+                {/* Title Statement & Imprint Line (starts at first indent, wraps to second) */}
+                <Typography variant="body2" sx={{ ...hangingIndentStyle2 }}>
+                  {bookTitle} {bookTitle && primaryAuthor ? '/' : ''} {primaryAuthor}
+                  <br />
+                  .--. {publisher}, {copyrightYear}.
+                </Typography>
+                
+                {/* Collation line (starts at first indent, wraps to second) */}
+                {collationLine && (
+                  <Typography variant="body2" sx={{ ...hangingIndentStyle }}>
+                    {collationLine}
+                  </Typography>
+                )}
+                
+                {/* ISBN line (starts at first indent, wraps to second) */}
+                {isbn && (
+                  <Typography variant="body2" sx={{ ...hangingIndentStyle }}>
+                    ISBN {isbn}.
+                  </Typography>
+                )}
+
+                {/* Remarks/Notes line (starts at first indent, wraps to second) */}
+                {remarks && (
+                  <Typography variant="body2" sx={{ ...hangingIndentStyle }}>
+                    Notes: {remarks}.
+                  </Typography>
+                )}
+
+                {/* Tracing Subjects line (starts at first indent, wraps to second) */}
+                {formattedTracingSubjects && (
+                  <Typography variant="body2" sx={{ ...formattedTracingSubjectsStyle }}>
+                    {formattedTracingSubjects}
+                  </Typography>
+                )}
+            </Box>
         </Box>
       </Paper>
     );
@@ -202,7 +284,6 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
 
   return (
     <>
-      {/* Dialog for preview (hidden on print) */}
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth className="no-print-dialog">
         <DialogTitle>Print {cardType}</DialogTitle>
         <DialogContent dividers>
@@ -216,7 +297,6 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
         </DialogActions>
       </Dialog>
 
-      {/* Render the card content into the print portal only when the dialog is open */}
       {open && printPortalRoot && ReactDOM.createPortal(
         <div className="print-only-container">
           {renderCardContent()}
@@ -224,7 +304,6 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
         printPortalRoot
       )}
 
-      {/* Add a style block for print-specific CSS */}
       <style jsx global>{`
         @media print {
           body > #root,
@@ -262,12 +341,11 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
             margin: 0;
             padding: 0;
             box-shadow: none !important;
+            border: 1px solid black !important;
             
-            /* Ensure exact size for print consistency */
-            width: ${CARD_WIDTH_PX}px;
-            height: ${CARD_HEIGHT_PX}px;
-            
-            /* FIX: Ensure text is black and background is white only for print */
+            width: ${CARD_WIDTH_CM}cm;
+            height: ${CARD_HEIGHT_CM}cm;
+            margin-bottom: 20px;
             color: black !important;
             background-color: white !important;
           }
