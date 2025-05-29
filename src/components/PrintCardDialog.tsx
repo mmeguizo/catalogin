@@ -21,126 +21,179 @@ interface PrintCardDialogProps {
 }
 
 const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bookData, cardType }) => {
-  console.log('PrintCardDialog: Component Render');
-  console.log('  Props received:');
-  console.log('    open:', open);
-  console.log('    cardType:', cardType);
-  console.log('    bookData (ID):', bookData ? bookData.id : 'null');
-
   if (!bookData) {
-    console.warn('PrintCardDialog: bookData is null or undefined, returning null.');
     return null; // Don't render if no book data
   }
 
-  // Use actual data from bookData, with fallbacks to empty string if not present
+  // --- Data Extraction and Formatting ---
+  const accessionNumber = bookData.Accession_Number || '';
+  const titleNumber = bookData.Title_Number || '';
   const bookTitle = bookData.Title || '';
-  const primaryAuthor = bookData.Author || bookData.author_notation || ''; // Use primary Author, fallback to notation
+  const primaryAuthor = bookData.Author || '';
+  const authorNotation = bookData.author_notation || '';
   const publisher = bookData.Publisher || '';
   const copyrightYear = bookData.copyright_year || '';
+  const prelimPage = bookData.Prelim_page || '';
   const pages = bookData.Pages || '';
-  const dimension = bookData.dimension || '';
   const description = bookData.Description || '';
+  const dimension = bookData.dimension || '';
   const accompanyingMaterials = bookData.Accompanying_materials || '';
   const isbn = bookData.ISBN || '';
   const generalSubject = bookData.General_Subject || '';
   const remarks = bookData.remarks || '';
+  const ddc = bookData.ddc || '';
+  const classNumber = bookData.class_number || '';
+  const risNumber = bookData.ris_number || '';
+  const copy = bookData.copy || '';
+  const location = bookData.Location || 'CY';
 
-  // For subjects, you might combine General_Subject and Course_Codes
-  const inferredTracingSubjects = [
+  // Format: "Vii, 306 pages : some illustrations ; 25cm. + 1 CD ROM."
+  const collationLine = [
+    prelimPage ? `${prelimPage},` : '',
+    pages ? `${pages} pages :` : '',
+    description ? `${description} ;` : '',
+    dimension ? `${dimension}.` : '',
+    accompanyingMaterials ? `+ ${accompanyingMaterials}.` : ''
+  ].filter(Boolean).join(' ').replace(/, :/, ':');
+
+  const tracingSubjects = [
     generalSubject,
     bookData.Course_Code1,
     bookData.Course_Code2,
     bookData.Course_Code3,
     bookData.Course_Code4,
     bookData.Course_Code5,
-  ].filter(Boolean).map((s, i) => `${i + 1}. ${s}`).join(' ');
+  ].filter(Boolean);
 
+  const formattedTracingSubjects = tracingSubjects.length > 0
+    ? tracingSubjects.map((s, i) => `${i + 1}. ${s}`).join(' ') + '.'
+    : '';
 
-  // Refined card dimensions for better preview and print
-  const CARD_WIDTH_PX = 360; // 12.5cm * ~28.35 px/cm
-  const CARD_HEIGHT_PX = 210; // 7.5cm * ~28.35 px/cm
+  // --- ADJUSTED: Card dimensions ---
+  const CARD_WIDTH_PX = 600;
+  const CARD_HEIGHT_PX = 350;
 
   const renderCardContent = () => {
+    // --- ADJUSTED: Common Left Column Style (for DDC, Class No., Author Notation) ---
+    const commonLeftColStyle = {
+      position: 'absolute',
+      left: '0.3cm', // Closer to left edge
+      fontSize: '0.8rem',
+      lineHeight: 1.2,
+    };
+
+    // --- ADJUSTED: Main Content Line Style (for Title, Author, Imprint, Collation etc.) ---
+    const mainContentLineStyle = {
+      ml: '2.5rem', // Indent content lines starting from 2.5rem (approx 0.88 inch or 2.2cm)
+      fontSize: '0.9rem',
+      lineHeight: 1.3,
+      wordBreak: 'break-word',
+    };
+
+    // --- ADJUSTED: Common Elements (Now includes bottom-left info) ---
     const commonElements = (
       <React.Fragment>
-        <Typography variant="body2" sx={{ position: 'absolute', top: 8, left: 8, fontSize: '0.85rem' }}>
-          {bookData.ddc}
+        {/* Top Left Classification Info */}
+        <Typography variant="body2" sx={{ ...commonLeftColStyle, top: '0.3cm' }}>
+          {location}
         </Typography>
-        <Typography variant="body2" sx={{ position: 'absolute', top: 28, left: 8, fontSize: '0.85rem' }}>
-          {bookData.class_number}
+        <Typography variant="body2" sx={{ ...commonLeftColStyle, top: '0.9cm' }}>
+          {ddc}
         </Typography>
-        <Typography variant="body2" sx={{ position: 'absolute', top: 48, left: 8, fontSize: '0.85rem' }}>
-          {bookData.author_notation}
+        <Typography variant="body2" sx={{ ...commonLeftColStyle, top: '1.5cm' }}>
+          {classNumber}
         </Typography>
-        <Typography variant="body2" sx={{ position: 'absolute', bottom: 8, left: 8, fontSize: '0.75rem' }}>
-          Accession: {bookData.ris_number}
+        <Typography variant="body2" sx={{ ...commonLeftColStyle, top: '2.1cm' }}>
+          {authorNotation}
         </Typography>
-        <Typography variant="body2" sx={{ position: 'absolute', bottom: 24, left: 8, fontSize: '0.75rem' }}>
-          Copy: {bookData.copy}
-        </Typography>
+
+        {/* --- MOVED/ADJUSTED: Bottom-Left Accession/Title/RIS/Copy Info --- */}
+        <Box sx={{ position: 'absolute', bottom: '0.3cm', left: '0.3cm', fontSize: '0.75rem', lineHeight: 1.2 }}>
+            {accessionNumber && <Typography variant="body2" sx={{ fontSize: 'inherit' }}>Acc. #: {accessionNumber}</Typography>}
+            {titleNumber && <Typography variant="body2" sx={{ fontSize: 'inherit' }}>Title #: {titleNumber}</Typography>}
+            {risNumber && <Typography variant="body2" sx={{ fontSize: 'inherit' }}>RIS #: {risNumber}</Typography>}
+            {copy && <Typography variant="body2" sx={{ fontSize: 'inherit' }}>Copy: {copy}</Typography>}
+        </Box>
       </React.Fragment>
     );
-
-    console.log('PrintCardDialog: Rendering card content for type:', cardType);
 
     return (
       <Paper
         id="print-card-content"
         elevation={1}
         sx={{
-          p: 2,
+          p: '0.5cm',
           border: '1px solid #ccc',
           width: CARD_WIDTH_PX,
           height: CARD_HEIGHT_PX,
           position: 'relative',
           overflow: 'hidden',
-          fontSize: '0.85rem',
+          fontFamily: 'monospace',
+          // REMOVED FOR PREVIEW BACKGROUND: color: 'black', backgroundColor: 'white',
         }}
       >
         {commonElements}
-        {cardType === 'Author Card' && (
-          <Typography variant="body1" sx={{ mt: 1, ml: 5, fontWeight: 'bold', fontSize: '0.9rem' }}>
-            {primaryAuthor}
-          </Typography>
-        )}
-        {cardType === 'Title Card' && (
-          <Typography variant="body1" sx={{ mt: 1, ml: 5, fontWeight: 'bold', fontSize: '0.9rem' }}>
-            {bookTitle}
-          </Typography>
-        )}
-        {cardType === 'Subject Card' && (
-          <Typography variant="body1" sx={{ mt: 1, ml: 5, fontWeight: 'bold', fontSize: '0.9rem' }}>
-            {generalSubject || inferredTracingSubjects.split('.')[0].trim()} {/* Use general subject if available */}
-          </Typography>
-        )}
 
-        {/* Main content for all cards */}
-        <Typography variant="body2" sx={{ mt: 0.5, ml: 5, fontSize: '0.85rem' }}>
-          {bookTitle} / {primaryAuthor}. - {publisher} : {copyrightYear}.
-        </Typography>
-        <Typography variant="body2" sx={{ mt: 0.5, ml: 5, fontSize: '0.85rem' }}>
-          {pages} : {description} ; {dimension}.
-        </Typography>
-        {accompanyingMaterials && (
-          <Typography variant="body2" sx={{ mt: 0.5, ml: 5, fontSize: '0.85rem' }}>
-            Accompanying materials: {accompanyingMaterials}.
+        {/* --- ADJUSTED: Main Content Area Positioning --- */}
+        <Box sx={{ position: 'absolute', top: '2.8cm', left: '0.5cm', right: '0.5cm', bottom: '0.5cm', overflow: 'hidden' }}>
+          {/* Primary Entry Line - adjusted for bolding and specific card type */}
+          {cardType === 'Author Card' && (
+            <Typography variant="body1" sx={{ ...mainContentLineStyle, fontWeight: 'bold' }}>
+              {primaryAuthor}.
+            </Typography>
+          )}
+          {cardType === 'Title Card' && (
+            <Typography variant="body1" sx={{ ...mainContentLineStyle, fontWeight: 'bold' }}>
+              {bookTitle}.
+            </Typography>
+          )}
+          {cardType === 'Subject Card' && (
+            <Typography variant="body1" sx={{ ...mainContentLineStyle, fontWeight: 'bold', textTransform: 'uppercase' }}>
+              {generalSubject || (formattedTracingSubjects.split('.')[0] || '').trim()}.
+            </Typography>
+          )}
+
+          {/* --- ADJUSTED: Subsequent lines with correct indentation and conditional rendering --- */}
+          {/* Author line for Title/Subject cards */}
+          {cardType !== 'Author Card' && primaryAuthor && (
+            <Typography variant="body2" sx={{ ...mainContentLineStyle, ml: '2.5rem' }}>
+                {primaryAuthor}.
+            </Typography>
+          )}
+          
+          {/* Title and Imprint line */}
+          <Typography variant="body2" sx={{ ...mainContentLineStyle, ml: '2.5rem' }}>
+            {bookTitle} {bookTitle && primaryAuthor ? '/' : ''} {primaryAuthor}. -- {publisher}, {copyrightYear}.
           </Typography>
-        )}
-        {isbn && (
-          <Typography variant="body2" sx={{ mt: 0.5, ml: 5, fontSize: '0.85rem' }}>
-            ISBN: {isbn}.
-          </Typography>
-        )}
-        {remarks && (
-          <Typography variant="body2" sx={{ mt: 0.5, ml: 5, fontSize: '0.85rem' }}>
-            Notes: {remarks}.
-          </Typography>
-        )}
-        {inferredTracingSubjects && (
-          <Typography variant="body2" sx={{ mt: 0.5, ml: 5, fontSize: '0.85rem' }}>
-            {inferredTracingSubjects}
-          </Typography>
-        )}
+          
+          {/* Collation line */}
+          {collationLine && (
+            <Typography variant="body2" sx={{ ...mainContentLineStyle, ml: '2.5rem' }}>
+              {collationLine}
+            </Typography>
+          )}
+          
+          {/* ISBN line */}
+          {isbn && (
+            <Typography variant="body2" sx={{ ...mainContentLineStyle, ml: '2.5rem' }}>
+              ISBN {isbn}.
+            </Typography>
+          )}
+
+          {/* Remarks/Notes line */}
+          {remarks && (
+            <Typography variant="body2" sx={{ ...mainContentLineStyle, ml: '2.5rem' }}>
+              Notes: {remarks}.
+            </Typography>
+          )}
+
+          {/* Tracing Subjects line */}
+          {formattedTracingSubjects && (
+            <Typography variant="body2" sx={{ ...mainContentLineStyle, ml: '2.5rem' }}>
+              {formattedTracingSubjects}
+            </Typography>
+          )}
+        </Box>
       </Paper>
     );
   };
@@ -149,6 +202,7 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
 
   return (
     <>
+      {/* Dialog for preview (hidden on print) */}
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth className="no-print-dialog">
         <DialogTitle>Print {cardType}</DialogTitle>
         <DialogContent dividers>
@@ -162,6 +216,7 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
         </DialogActions>
       </Dialog>
 
+      {/* Render the card content into the print portal only when the dialog is open */}
       {open && printPortalRoot && ReactDOM.createPortal(
         <div className="print-only-container">
           {renderCardContent()}
@@ -169,6 +224,7 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
         printPortalRoot
       )}
 
+      {/* Add a style block for print-specific CSS */}
       <style jsx global>{`
         @media print {
           body > #root,
@@ -206,6 +262,14 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
             margin: 0;
             padding: 0;
             box-shadow: none !important;
+            
+            /* Ensure exact size for print consistency */
+            width: ${CARD_WIDTH_PX}px;
+            height: ${CARD_HEIGHT_PX}px;
+            
+            /* FIX: Ensure text is black and background is white only for print */
+            color: black !important;
+            background-color: white !important;
           }
         }
       `}</style>
