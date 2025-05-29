@@ -159,10 +159,10 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
           <Typography variant="body2" sx={{ position: 'absolute', top: '0.5cm', left: '0cm', fontSize: '0.8rem', lineHeight: 1.2 }}>
             {ddc} {classNumber} {/* Combined DDC and Class Number */}
           </Typography>
-          <Typography variant="body2" sx={{ position: 'absolute', top: '1.5cm', left: '0cm', fontSize: '0.8rem', lineHeight: 1.2 }}>
+          <Typography variant="body2" sx={{ position: 'absolute', top: '1cm', left: '0cm', fontSize: '0.8rem', lineHeight: 1.2 }}>
             {authorNotation}
           </Typography>
-          <Typography variant="body2" sx={{ position: 'absolute', top: '2.0cm', left: '0cm', fontSize: '0.8rem', lineHeight: 1.2 }}>
+          <Typography variant="body2" sx={{ position: 'absolute', top: '1.5cm', left: '0cm', fontSize: '0.8rem', lineHeight: 1.2 }}>
             {copyrightYear}
           </Typography>
 
@@ -193,7 +193,6 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
             flexDirection: 'column',
             justifyContent: 'flex-start',
             alignItems: 'flex-start',
-            // borderLeft: '1px dotted green' // For visual debugging
         }}>
             {/* --- Primary Entry (Authors, Title, or Subject) --- */}
             {/* Positioned absolutely to align with the DDC/Class Number block (indent0) if card type is Title/Subject */}
@@ -211,14 +210,13 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({ open, handleClose, bo
                 }}
               >
                 {cardType === 'Title Card' ? bookTitle : (generalSubject)}.
-                {/* {cardType === 'Title Card' ? bookTitle : (generalSubject || (formattedTracingSubjects.split('.')[0] || '').trim())}. */}
               </Typography>
             )}
 
             {/* --- Author/Title/Subject Main Entry (for Author Card) --- */}
             {cardType === 'Author Card' && (
-              <Box sx={{ width: '100%', /* border: '1px dotted red', */ mb: '0.1cm', mt: '0.0cm' /* Aligns with top of green box */ }}>
-                  <Typography variant="body1" sx={{ ...deepIndentStyle, fontWeight: 'bold' }}>
+              <Box sx={{ width: '100%', /* border: '1px dotted red', */ mb: '0.1cm', mt: '0.5cm' /* Aligns with top of green box */ }}>
+                  <Typography variant="body1" sx={{ ...deepIndentStyle, }}>
                     {primaryAuthor}.
                   </Typography>
               </Box>
