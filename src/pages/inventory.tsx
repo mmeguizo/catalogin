@@ -256,6 +256,7 @@ export default function InventoryPage() {
                   showQuickFilter: true,
                 },
               }}
+              showToolbar
               getRowId={(row) => row.id}
             />
           </div>
