@@ -181,7 +181,7 @@ const PrintCardDialog: React.FC<PrintCardDialogProps> = ({
               fontSize: "0.8rem",
               lineHeight: 1.2,
             }}
-          >
+          > 
             {ddc} {classNumber} {/* Combined DDC and Class Number */}
           </Typography>
           <Typography
