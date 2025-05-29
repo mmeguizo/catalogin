@@ -95,15 +95,7 @@ export default function InventoryPage() {
       
       return {
         id: book.id,
-        class_number: book.class_number,
-        author_notation: book.author_notation,
-        copyright_year: book.copyright_year,
-        copy: book.copy,
-        ris_number: book.ris_number,
-        date_added: dateAddedFormatted,
-        remarks: book.remarks,
-        ddc: book.ddc,
-        // NEW FIELDS - ensure they are explicitly mapped if needed, though spread should work
+        // Ensure all fields are explicitly mapped from book data
         Accession_Number: book.Accession_Number,
         Title_Number: book.Title_Number,
         Title: book.Title,
@@ -133,23 +125,22 @@ export default function InventoryPage() {
         Course_Code5: book.Course_Code5,
         Department: book.Department,
         Location: book.Location,
+        class_number: book.class_number,
+        author_notation: book.author_notation,
+        copyright_year: book.copyright_year,
+        copy: book.copy,
+        ris_number: book.ris_number,
+        date_added: dateAddedFormatted, // This is now a Date object or null
+        remarks: book.remarks,
+        ddc: book.ddc,
       };
     });
     return mappedRows;
   }, [books]);
 
   const columns = React.useMemo(() => {
-    // UPDATED: manualWidths to include all new columns
+    // UPDATED: manualWidths to include all new columns in the same order as in book.ts fields array
     const manualWidths: { [key: string]: number } = {
-      id: 100, // Adjusted ID width
-      class_number: 120,
-      author_notation: 120,
-      copyright_year: 100,
-      copy: 60,
-      ris_number: 100,
-      date_added: 140,
-      remarks: 180,
-      ddc: 80,
       Accession_Number: 150,
       Title_Number: 120,
       Title: 250,
@@ -179,18 +170,30 @@ export default function InventoryPage() {
       Course_Code5: 120,
       Department: 100,
       Location: 100,
+      class_number: 120,
+      author_notation: 120,
+      copyright_year: 100,
+      copy: 60,
+      ris_number: 100,
+      date_added: 140,
+      remarks: 180,
+      ddc: 80,
+      id: 100, // ID column
       print_actions: 80, // Width for the new print column
     };
 
+    // Make sure the order here matches the order in booksDataSource.fields
+    // and the manualWidths order for consistency and predictability.
     const baseColumns = booksDataSource.fields.map((field) => {
       return {
         field: field.field,
         headerName: field.headerName,
-        width: manualWidths[field.field] || 150,
+        width: manualWidths[field.field] || 150, // Use manual width or a default
         type: field.type,
         sortable: true,
         filterable: true,
-        // valueGetter: field.valueGetter
+        // valueGetter is needed here if your booksDataSource defines it for client-side transforms
+        // valueGetter: field.valueGetter 
         //   ? (params: any) => field.valueGetter!(params.value)
         //   : undefined,
       };
@@ -256,7 +259,16 @@ export default function InventoryPage() {
                   showQuickFilter: true,
                 },
               }}
-              showToolbar
+              // FIX: Reverted paginationMode to "client" to match booksDataSource.getMany
+              paginationMode="client" 
+              // FIX: Removed redundant showToolbar as it's handled by slots={{ toolbar: GridToolbar }}
+              // showToolbar 
+              // FIX: Removed autosizeOptions as manual widths are set
+              // autosizeOptions={{
+              //   columns: ['id', 'class_number', 'author_notation', 'copyright_year', 'copy', 'ris_number', 'date_added', 'remarks', 'ddc'],
+              //   includeOutliers: true,
+              //   includeHeaders: false,
+              // }}
               getRowId={(row) => row.id}
             />
           </div>
