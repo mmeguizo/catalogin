@@ -33,7 +33,7 @@ const NAVIGATION: Navigation = [
   },
   {
     segment: 'imports',
-    title: 'Import/Export',
+    title: 'Import',
     icon: <ImportExportIcon />,
     // pattern: 'employees{/:employeeId}*',
   },
