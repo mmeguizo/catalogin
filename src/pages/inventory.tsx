@@ -259,6 +259,7 @@ export default function InventoryPage() {
                   showQuickFilter: true,
                 },
               }}
+              showToolbar
               // FIX: Reverted paginationMode to "client" to match booksDataSource.getMany
               paginationMode="client" 
               // FIX: Removed redundant showToolbar as it's handled by slots={{ toolbar: GridToolbar }}
