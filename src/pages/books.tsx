@@ -12,7 +12,7 @@ export default function BooksCrudPage() {
       rootPath="/books"
       initialPageSize={25}
       defaultValues={{ itemCount: 1 }}
-      showToolbar 
+      showToolbar={true} 
     />
   );
 }

@@ -8,6 +8,7 @@ import { firebaseSignOut, onAuthStateChanged, isEmailAllowed } from './firebase/
 import SessionContext, { type Session } from './SessionContext';
 import BookIcon from '@mui/icons-material/Book';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
+import ImportExportIcon from '@mui/icons-material/ImportExport';
 const NAVIGATION: Navigation = [
   {
     kind: 'header',
@@ -28,6 +29,12 @@ const NAVIGATION: Navigation = [
     segment: 'inventory',
     title: 'Books',
     icon: <BookIcon />,
+    // pattern: 'employees{/:employeeId}*',
+  },
+  {
+    segment: 'imports',
+    title: 'Import',
+    icon: <ImportExportIcon />,
     // pattern: 'employees{/:employeeId}*',
   },
 ];
