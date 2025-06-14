@@ -230,9 +230,10 @@ export const booksDataSource: DataSource<Book> = {
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
+        const docData = docSnap.data();
         return {
-          id: docSnap.id,
-          ...docSnap.data()
+          ...(docData.value || {}), // Spread properties from the 'value' field
+          id: docSnap.id, // Ensure 'id' is a top-level property
         } as Book;
       } else {
         throw new Error('Book not found');
@@ -261,9 +262,15 @@ export const booksDataSource: DataSource<Book> = {
       }
 
       // FIX: Remove undefined values before sending to Firestore
-      const cleanedData = removeUndefined(data);
-      const docRef = await addDoc(booksCollectionRef, cleanedData);
-      const newBook = { id: docRef.id, ...cleanedData } as Book; // Use cleanedData
+      // The 'data' from the form is flat. We need to prepare it
+      // to be stored with properties nested under 'value' in Firestore.
+      const cleanedIncomingData = removeUndefined(data);
+
+      // Prepare the document to be saved with properties under 'value'
+      const documentToSave = { value: cleanedIncomingData };
+
+      const docRef = await addDoc(booksCollectionRef, documentToSave);
+      const newBook = { id: docRef.id, ...cleanedIncomingData } as Book; // Return a flat structure for UI consistency
       return newBook;
     } catch (error) {
       throw error;
@@ -272,14 +279,23 @@ export const booksDataSource: DataSource<Book> = {
   updateOne: async (bookId, data) => {
     try {
       // FIX: Remove undefined values before sending to Firestore
-      const cleanedData = removeUndefined(data);
+      // The 'data' from the form is flat. We need to prepare it
+      // to update the nested 'value' field in Firestore.
+      const cleanedIncomingData = removeUndefined(data);
+
+      // Construct the update object to target fields within 'value'
+      const updatePayload: { [key: string]: any } = {};
+      for (const key in cleanedIncomingData) {
+        if (key !== 'id') { // Don't try to update the 'id' within 'value'
+          updatePayload[`value.${key}`] = cleanedIncomingData[key];
+        }
+      }
+
       const docRef = doc(db, 'books', bookId as string);
-      await updateDoc(docRef, cleanedData);
+      await updateDoc(docRef, updatePayload);
       
-      return {
-        id: bookId as string,
-        ...data // return original data for local cache consistency
-      } as Book;
+      // For consistency and to reflect the update, re-fetch the updated document
+      return booksDataSource.getOne!(bookId);
     } catch (error) {
       console.error('Error updating book:', error);
       throw error;
