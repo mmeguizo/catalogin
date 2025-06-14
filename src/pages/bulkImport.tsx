@@ -66,14 +66,14 @@ export default function BulkImportsPage() {
 
             // Try matching by headerName (case-insensitive)
             const rowKeys = Object.keys(row);
-            const foundHeaderKey = rowKeys.find(key => key.toLowerCase() === headerNameFromDef.toLowerCase());
+            const foundHeaderKey = rowKeys.find(key => key.toLowerCase() === String(headerNameFromDef).toLowerCase());
             if (foundHeaderKey) {
               excelValue = row[foundHeaderKey];
             }
 
             // If not found by headerName, and fieldName is different, try by fieldName (case-insensitive)
-            if (excelValue === undefined && fieldName.toLowerCase() !== headerNameFromDef.toLowerCase()) {
-              const foundFieldKey = rowKeys.find(key => key.toLowerCase() === fieldName.toLowerCase());
+            if (excelValue === undefined && String(fieldName).toLowerCase() !== String(headerNameFromDef).toLowerCase()) {
+              const foundFieldKey = rowKeys.find(key => key.toLowerCase() ===String(fieldName).toLowerCase());
               if (foundFieldKey) {
                 excelValue = row[foundFieldKey];
               }
@@ -90,7 +90,7 @@ export default function BulkImportsPage() {
                   const num = Number(parsedValue);
                   parsedValue = isNaN(num) ? undefined : num;
                   if (parsedValue === undefined) {
-                      console.warn(`Row ${rowIndex + 2}, Field "${fieldName}": Could not parse "${String(excelValue)}" as number.`);
+                      console.warn(`Row ${rowIndex + 2}, Field "${String(fieldName).toLowerCase()}": Could not parse "${String(excelValue)}" as number.`);
                   }
                   break;
                 case 'date': // Assuming Zod expects a string like 'YYYY-MM-DD' for date fields like 'date_added'
@@ -106,7 +106,7 @@ export default function BulkImportsPage() {
                     parsedValue = tempDate.toISOString().split('T')[0]; // Format as YYYY-MM-DD
                   } else {
                     parsedValue = undefined; // Could not parse as a valid date
-                    console.warn(`Row ${rowIndex + 2}, Field "${fieldName}": Could not parse "${String(excelValue)}" as date string.`);
+                    console.warn(`Row ${rowIndex + 2}, Field "${String(fieldName).toLowerCase()}": Could not parse "${String(excelValue)}" as date string.`);
                   }
                   break;
                 case 'boolean':
@@ -150,64 +150,90 @@ export default function BulkImportsPage() {
 
           // Log the raw input from Excel for this row BEFORE any validation attempt
           console.log(`[DEBUG] Raw input for Excel row ${excelRowNumber} (Title from input: ${bookInput.Title || 'N/A'}):`, JSON.parse(JSON.stringify(bookInput)));
+          console.log(`[DEBUG] Excel row ${excelRowNumber}: Accession_Number from input: "${bookInput.Accession_Number}" (Type: ${typeof bookInput.Accession_Number})`);
 
           let validatedBookData: Partial<Book> | undefined;
           let validationFailed = false;
           let validationIssues: any[] = []; // To store ZodError issues
 
-          try {
-            // 1. Validate the book data using booksDataSource.validate
-            // The validate function will throw a ZodError on failure.
-            if (booksDataSource.validate) { // Type guard for validate method
-              validatedBookData = await booksDataSource.validate(bookInput as Partial<Omit<Book, 'id'>>);
-              // If it reaches here, validation was successful
-            } else {
-              // This case should ideally not be reached if booksDataSource is correctly defined
-              throw new Error("booksDataSource.validate method is not defined.");
+          if (booksDataSource.validate) {
+            try {
+              // Attempt to validate. This will throw a ZodError on failure.
+              const validatedDataFromZod = await booksDataSource.validate(bookInput as Partial<Omit<Book, 'id'>>);
+              // If it reaches here, validation was successful.
+              // Toolpad's ['~standard'].validate might wrap data in a 'value' property.
+              validatedBookData = (validatedDataFromZod as any)?.value || validatedDataFromZod;
+                  console.log(`[DEBUG] Excel row ${excelRowNumber}: ZodValidation PASSED. Validated data (potentially unwrapped):`, JSON.parse(JSON.stringify(validatedBookData)));
+            } catch (error: any) {
+              // Handle failed validation: extract issues or use a generic message
+              validationFailed = true;
+              validationErrorCount++;
+              console.log(`[DEBUG] Excel row ${excelRowNumber}: Validation FAILED. Caught error:`, error);
+              // Ensure validationIssues is always an array
+                  // ZodError has a '.issues' property.
+              if (error.name === 'ZodError' && error.issues) {
+                console.log(`[DEBUG] ZodValidation FAILED for Excel row ${excelRowNumber}. Error object has 'issues' array:`, JSON.stringify(error.issues, null, 2));
+                validationIssues = error.issues;
+              } else if (typeof error.message === 'string') {
+                console.log(`[DEBUG] ZodValidation FAILED for Excel row ${excelRowNumber}. Error object has 'message':`, error.message);
+                // Attempt to parse message if it's a JSON string of issues (sometimes ZodErrors stringify this way)
+                try {
+                  const parsedIssues = JSON.parse(error.message);
+                  if (Array.isArray(parsedIssues)) validationIssues = parsedIssues;
+                  else validationIssues = [{ path: ['unknown'], message: error.message }];
+                } catch (e) {
+                  validationIssues = [{ path: ['unknown'], message: error.message }];
+                }
+              } else {
+                console.log(`[DEBUG] ZodValidation FAILED for Excel row ${excelRowNumber}. Error object is not standard ZodError:`, error);
+                const errorMessage = typeof error?.message === 'string' ? error.message : 'Unknown validation error structure caught.';
+                validationIssues = [{ path: ['unknown'], message: errorMessage }];
+              }
             }
-
-          } catch (error: any) {
-            // This catch block is specifically for errors thrown by booksDataSource.validate
-            validationFailed = true;
-            validationErrorCount++;
-            if (error.name === 'ZodError') { // Check if it's a ZodError
-              validationIssues = error.issues || [];
-              console.log(`[DEBUG] ZodValidation FAILED for Excel row ${excelRowNumber}. Issues:`, JSON.stringify(validationIssues, null, 2));
-            } else {
-              // Handle other unexpected errors during the validation call itself
-              console.error(`[DEBUG] Unexpected error during validation for row ${excelRowNumber}:`, error);
-              validationIssues = [{ path: ['unknown'], message: error.message || 'Unexpected validation error' }];
-            }
-            console.log(`[DEBUG] Input data for this row (validation error):`, bookInput);
+          } else {
+            // No validation method defined, proceed with raw input (or handle as error)
+            console.warn(`[DEBUG] No validation method defined in booksDataSource. Proceeding with raw input for row ${excelRowNumber}.`);
+            validatedBookData = bookInput; // Or set validationFailed = true if validation is mandatory
           }
 
           if (validationFailed) {
-            const fieldErrors = validationIssues.map((issue: any) => `${(issue.path && issue.path.join('.')) || 'field'}: ${issue.message}`).join('; ') || 'Unknown validation issue(s). Check console.';
+            // If validation failed, construct error messages and skip to the next row
+            const fieldErrors = validationIssues.map((issue: any) => {
+              const fieldKey = (issue.path && Array.isArray(issue.path) && issue.path.length > 0) ? issue.path[0] : 'unknown_field';
+              const fieldDefinition = booksDataSource.fields.find(f => f.field === fieldKey);
+              // Use headerName for user-friendly display, fallback to fieldKey with spaces
+              const displayName = fieldDefinition?.headerName || fieldKey.replace(/_/g, ' '); 
+              return `Column '${displayName}': ${issue.message}`;
+            }).join('; ') || 'Unknown validation issue(s). Check console.';
+            console.log(`[DEBUG] Excel row ${excelRowNumber}: Formatted field errors for UI: "${fieldErrors}"`);
             errors.push(`Row ${excelRowNumber} (Title: ${bookInput.Title || 'N/A'}): Validation failed - ${fieldErrors}`);
             continue; // Skip this book due to validation errors
           }
 
+          // If validation passed, proceed to create the book
           // Proceed with creation only if validation passed and we have data
-          // CRITICAL FIX: Ensure validation has not failed AND validatedBookData is present
-          if (!validationFailed && validatedBookData) { 
-            // 2. Create the book if validation passed
+          if (validatedBookData) { 
             if (!booksDataSource.createOne) {
               console.error("[DEBUG] booksDataSource.createOne method is not defined.");
               throw new Error("booksDataSource.createOne method is not defined. Cannot create book.");
             }
             try {
-              // Assuming validatedBookData is the plain book object if validation succeeded
-              // The { value: ... } wrapper in logs suggests Zod's ['~standard'].validate might behave differently
-              // than expected or there's an intermediate transformation.
-              // For now, let's assume validatedBookData IS the book data.
-              console.log(`[DEBUG] Attempting to create book for Excel row ${excelRowNumber} with VALIDATED data:`, validatedBookData);
-              await booksDataSource.createOne(validatedBookData as Omit<Book, 'id'>); // Pass validatedBookData directly
+              // Log the exact data payload being sent to createOne
+              console.log(`[DEBUG] Attempting to create book for Excel row ${excelRowNumber} with data payload:`, validatedBookData);
+              await booksDataSource.createOne(validatedBookData as Omit<Book, 'id'>); 
               successCount++;
+              console.log(`[DEBUG] Excel row ${excelRowNumber}: Successfully created.`);
             } catch (creationError: any) {
               creationErrorCount++;
+              // Log errors that occur during the createOne database operation
               errors.push(`Row ${excelRowNumber} (Title: ${bookInput.Title || 'N/A'}): Creation failed - ${creationError.message || 'Unknown error'}`);
-              console.error(`[DEBUG] Error creating book at Excel row ${excelRowNumber} (Title: ${bookInput.Title || 'N/A'}):`, creationError, 'Validated data:', validatedBookData);
+              console.error(`[DEBUG] Error during createOne for Excel row ${excelRowNumber} (Title: ${bookInput.Title || 'N/A'}):`, creationError, 'Data sent:', validatedBookData);
             }
+          } else if (!validationFailed) { // Should only be reached if booksDataSource.validate was undefined and we chose to not fail
+            validationFailed = true;
+            validationErrorCount++;
+            errors.push(`Row ${excelRowNumber} (Title: ${bookInput.Title || 'N/A'}): Skipped due to missing validation outcome or data.`);
+            continue; // Skip this book due to validation errors
           }
         }
 
