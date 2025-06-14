@@ -15,21 +15,23 @@ export default function DashboardPage() {
       setError(null);
       try {
         if (booksDataSource && booksDataSource.getMany) {
-          // Fetch all books for dashboard aggregation
           const result = await booksDataSource.getMany({
-            paginationModel: { page: 0, pageSize: 1000 }, // Fetch enough data
+            paginationModel: { page: 0, pageSize: 1000 },
             filterModel: { items: [] },
             sortModel: [],
           });
           if (result && Array.isArray(result.items)) {
             setBooks(result.items);
+            console.log('Dashboard: Fetched raw books data:', result.items);
           } else {
             setBooks([]);
+            console.warn('Dashboard: booksDataSource.getMany did not return expected array of items.');
           }
         } else {
           throw new Error("Books data source or its getMany method is not available.");
         }
       } catch (err: any) {
+        console.error('Dashboard: Error during data fetching:', err);
         setError(err);
       } finally {
         setIsLoading(false);
@@ -43,12 +45,22 @@ export default function DashboardPage() {
   const { years, booksByYear } = React.useMemo(() => {
     const counts: { [year: number]: number } = {};
     books.forEach(book => {
-      if (book.copyright_year) {
-        counts[book.copyright_year] = (counts[book.copyright_year] || 0) + 1;
+      if (book.copyright_year !== undefined && book.copyright_year !== null) {
+        const year = Number(book.copyright_year);
+        if (!isNaN(year)) {
+          counts[year] = (counts[year] || 0) + 1;
+        } else {
+          console.warn('Dashboard: Invalid copyright_year found:', book.copyright_year, 'for book ID:', book.id);
+        }
+      } else {
+        console.warn('Dashboard: Missing copyright_year for book ID:', book.id);
       }
     });
     const sortedYears = Object.keys(counts).map(Number).sort((a, b) => a - b);
     const seriesData = sortedYears.map(year => counts[year]);
+
+    console.log('Dashboard: Books by Year - Years:', sortedYears, 'Data:', seriesData);
+    
     return {
       years: sortedYears,
       booksByYear: [{ data: seriesData, label: 'Number of Books' }],
@@ -58,15 +70,21 @@ export default function DashboardPage() {
   const booksByDDC = React.useMemo(() => {
     const counts: { [ddc: string]: number } = {};
     books.forEach(book => {
-      if (book.ddc) {
-        counts[book.ddc] = (counts[book.ddc] || 0) + 1;
+      if (book.ddc && typeof book.ddc === 'string' && book.ddc.trim() !== '') {
+        const ddcClean = book.ddc.trim();
+        // FIX: Corrected typo from dddcClean to ddcClean
+        counts[ddcClean] = (counts[ddcClean] || 0) + 1; 
+      } else {
+        console.warn('Dashboard: Missing or invalid DDC for book ID:', book.id);
       }
     });
-    return Object.entries(counts).map(([ddc, value], index) => ({
+    const processedDDC = Object.entries(counts).map(([ddc, value], index) => ({
       id: index,
       value,
       label: ddc,
     }));
+    console.log('Dashboard: Books by DDC - Data:', processedDDC);
+    return processedDDC;
   }, [books]);
   // --- End Data Processing ---
 
@@ -111,7 +129,7 @@ export default function DashboardPage() {
               />
             ) : (
               <Typography variant="body2" sx={{ textAlign: 'center', p: 2 }}>
-                No copyright year data to display.
+                No copyright year data to display. Ensure books have valid 'Copyright Year'.
               </Typography>
             )}
           </Paper>
@@ -126,7 +144,7 @@ export default function DashboardPage() {
                 series={[
                   {
                     data: booksByDDC,
-                    arcLabel: (item) => `${item.label} (${item.value})`, // Show label and count
+                    arcLabel: (item) => `${item.label} (${item.value})`,
                     outerRadius: 120,
                     innerRadius: 60,
                     paddingAngle: 5,
@@ -137,7 +155,7 @@ export default function DashboardPage() {
                 ]}
                 sx={{
                   [`& .${pieArcLabelClasses.root}`]: {
-                    fill: 'white', // Ensure labels are visible
+                    fill: 'white',
                     fontWeight: 'bold',
                   },
                 }}
@@ -146,7 +164,7 @@ export default function DashboardPage() {
               />
             ) : (
               <Typography variant="body2" sx={{ textAlign: 'center', p: 2 }}>
-                No DDC classification data to display.
+                No DDC classification data to display. Ensure books have valid 'DDC'.
               </Typography>
             )}
           </Paper>
