@@ -111,7 +111,7 @@ export const booksDataSource: DataSource<Book> = {
     { field: 'ddc', headerName: 'DDC', width: 100 },
     { field: 'id', headerName: 'ID', width: 100 }, // ID is usually last or first
   ],
-  getMany: async ({ paginationModel, filterModel, sortModel }) => {
+  getMany: async ({ paginationModel, filterModel, sortModel } = { paginationModel: { page: 0, pageSize: 100 } }) => {
     try {
       const querySnapshot = await getDocs(booksCollectionRef);
       let books = querySnapshot.docs.map(doc => {
@@ -206,16 +206,24 @@ export const booksDataSource: DataSource<Book> = {
         console.log('[DEBUG book.ts getMany] Books after sorting (showing pre-sort for comparison if needed):', booksBeforeSort, 'Sorted books:', JSON.parse(JSON.stringify(books)));
       }
 
-      // Apply pagination (client-side)
-      const start = paginationModel.page * paginationModel.pageSize;
-      const end = start + paginationModel.pageSize;
-      const paginatedBooks = books.slice(start, end);
-
-      console.log('[DEBUG book.ts getMany] Paginated books to be returned:', JSON.parse(JSON.stringify(paginatedBooks)), 'Total item count:', books.length);
-      return {
-        items: paginatedBooks,
-        itemCount: books.length,
-      };
+      // Apply pagination (client-side) - Add null check for paginationModel
+      if (paginationModel) {
+        const start = paginationModel.page * paginationModel.pageSize;
+        const end = start + paginationModel.pageSize;
+        const paginatedBooks = books.slice(start, end);
+        
+        console.log('[DEBUG book.ts getMany] Paginated books to be returned:', JSON.parse(JSON.stringify(paginatedBooks)), 'Total item count:', books.length);
+        return {
+          items: paginatedBooks,
+          itemCount: books.length,
+        };
+      } else {
+        // If no pagination model, return all books
+        return {
+          items: books,
+          itemCount: books.length,
+        };
+      }
     } catch (error) {
       console.error('Error fetching books:', error);
       return {

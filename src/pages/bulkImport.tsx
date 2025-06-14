@@ -131,9 +131,42 @@ export default function BulkImportsPage() {
             return;
         }
 
+        // Before processing, fetch all existing accession numbers to check for duplicates
+        let existingAccessionNumbers: string[] = [];
+        try {
+          // Remove the invalid cache invalidation call
+          // await booksCache.invalidate(); <- This line causes the error
+          
+          // Directly fetch books from the data source
+          const booksResponse = await booksDataSource.getMany({});
+          const allBooks = booksResponse.items || [];
+          
+          // Make sure we have an array before calling map
+          if (Array.isArray(allBooks)) {
+            existingAccessionNumbers = allBooks
+              .map(book => book.Accession_Number?.toString().trim())
+              .filter(accNum => accNum && accNum.length > 0) as string[];
+            console.log(`[DEBUG] Fetched ${existingAccessionNumbers.length} existing accession numbers for duplicate checking`);
+          } else {
+            console.error('[DEBUG] Expected allBooks to be an array but got:', typeof allBooks);
+            existingAccessionNumbers = [];
+          }
+        } catch (error) {
+          console.error('[DEBUG] Error fetching existing accession numbers:', error);
+          // Provide a more detailed error message with troubleshooting steps
+          setMessage({ 
+            type: 'error', 
+            text: 'Failed to check for duplicates. This could be due to a database connection issue or server error. Please try again later or contact your system administrator if the problem persists. Error details: ' + (error instanceof Error ? error.message : 'Unknown error')
+          });
+          setIsLoading(false);
+          return;
+        }
+
         let successCount = 0;
         let validationErrorCount = 0;
         let creationErrorCount = 0;
+        let duplicateCount = 0;
+        let missingAccessionCount = 0;
         const errors: string[] = [];
 
         for (let i = 0; i < booksToProcess.length; i++) {
@@ -144,6 +177,23 @@ export default function BulkImportsPage() {
           // Basic check: skip if bookInput is essentially empty
           if (Object.keys(bookInput).length === 0) {
             errors.push(`Row ${excelRowNumber}: Skipped (empty row).`);
+            validationErrorCount++;
+            continue;
+          }
+
+          // Check if accession number is missing
+          if (!bookInput.Accession_Number || String(bookInput.Accession_Number).trim() === '') {
+            errors.push(`Row ${excelRowNumber} (Title: ${bookInput.Title || 'N/A'}): Missing Accession Number.`);
+            missingAccessionCount++;
+            validationErrorCount++;
+            continue;
+          }
+
+          // Check for duplicate accession numbers
+          const accessionNumber = String(bookInput.Accession_Number).trim();
+          if (existingAccessionNumbers.includes(accessionNumber)) {
+            errors.push(`Row ${excelRowNumber} (Title: ${bookInput.Title || 'N/A'}): Duplicate Accession Number "${accessionNumber}" already exists in the database.`);
+            duplicateCount++;
             validationErrorCount++;
             continue;
           }
@@ -221,6 +271,8 @@ export default function BulkImportsPage() {
               // Log the exact data payload being sent to createOne
               console.log(`[DEBUG] Attempting to create book for Excel row ${excelRowNumber} with data payload:`, validatedBookData);
               await booksDataSource.createOne(validatedBookData as Omit<Book, 'id'>); 
+              // Add the new accession number to our tracking array to prevent duplicates within the same import
+              existingAccessionNumbers.push(accessionNumber);
               successCount++;
               console.log(`[DEBUG] Excel row ${excelRowNumber}: Successfully created.`);
             } catch (creationError: any) {
@@ -240,8 +292,17 @@ export default function BulkImportsPage() {
         let resultMessage = `Successfully imported ${successCount} books.`;
         const totalFailures = validationErrorCount + creationErrorCount;
 
-        if (totalFailures > 0) {
-          resultMessage = `Import summary: ${successCount} books imported. ${validationErrorCount} failed validation. ${creationErrorCount} failed creation.`;
+        // After processing all books, if there were duplicates, provide a summary
+        if (duplicateCount > 0) {
+          const duplicateErrors = errors.filter(err => err.includes('Duplicate Accession Number'));
+          const duplicateSummary = duplicateErrors.length > 0 
+            ? `\n\nDuplicate accession numbers found in rows:\n- ${duplicateErrors.join('\n- ')}` 
+            : '';
+          
+          resultMessage = `Import summary: ${successCount} books imported. ${validationErrorCount} failed validation (including ${duplicateCount} duplicates and ${missingAccessionCount} missing accession numbers). ${creationErrorCount} failed creation.${duplicateSummary}`;
+          setMessage({ type: 'error', text: resultMessage });
+        } else if (totalFailures > 0) {
+          resultMessage = `Import summary: ${successCount} books imported. ${validationErrorCount} failed validation (including ${duplicateCount} duplicates and ${missingAccessionCount} missing accession numbers). ${creationErrorCount} failed creation.`;
           const errorDetails = errors.slice(0, 15).join('\n- '); // Show up to 15 detailed errors
           resultMessage += `\n\nErrors:\n- ${errorDetails}${errors.length > 15 ? '\n... (more errors in console)' : ''}`;
           setMessage({ type: 'error', text: resultMessage });
@@ -253,8 +314,7 @@ export default function BulkImportsPage() {
           } else {
             setMessage({ type: 'info', text: 'No valid book data found to import.' });
           }
-        }
-         else {
+        } else {
           setMessage({ type: 'success', text: resultMessage });
         }
         
