@@ -1,8 +1,8 @@
 // src/data/book.ts
 'use client';
 import { DataModel, DataSource, DataSourceCache } from '@toolpad/core/Crud';
-import { z } from 'zod';
-import { collection, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { z, ZodError } from 'zod';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, query, where, limit } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 
 export interface Book extends DataModel {
@@ -114,16 +114,24 @@ export const booksDataSource: DataSource<Book> = {
   getMany: async ({ paginationModel, filterModel, sortModel }) => {
     try {
       const querySnapshot = await getDocs(booksCollectionRef);
-      let books = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Book[];
+      let books = querySnapshot.docs.map(doc => {
+        const docData = doc.data();
+        // Assuming the actual book properties are nested under 'value'
+        // and combining it with the document's ID.
+        // The Crud component expects 'id' to be a top-level property of the item.
+        return {
+          ...(docData.value || {}), // Spread the properties from the 'value' field
+          id: doc.id, // Ensure the document ID is the 'id' property
+        } as Book;
+      });
+      console.log('[DEBUG book.ts getMany] Initial books fetched from Firestore:', JSON.parse(JSON.stringify(books)));
 
       // Apply filters (client-side)
       if (filterModel?.items?.length) {
         filterModel.items.forEach(({ field, value, operator }) => {
           if (!field || value == null) return;
 
+          const preFilterCount = books.length;
           books = books.filter((book) => {
             const fieldDef = booksDataSource.fields.find(f => f.field === field);
             // Use String() conversion to handle potential non-string values more gracefully
@@ -163,10 +171,12 @@ export const booksDataSource: DataSource<Book> = {
             }
           });
         });
+        console.log('[DEBUG book.ts getMany] Books after filtering:', JSON.parse(JSON.stringify(books)));
       }
 
       // Apply sorting (client-side)
       if (sortModel?.length) {
+        const booksBeforeSort = JSON.parse(JSON.stringify(books)); // For logging
         books.sort((a, b) => {
           for (const { field, sort } of sortModel) {
             const fieldDef = booksDataSource.fields.find(f => f.field === field);
@@ -193,6 +203,7 @@ export const booksDataSource: DataSource<Book> = {
           }
           return 0;
         });
+        console.log('[DEBUG book.ts getMany] Books after sorting (showing pre-sort for comparison if needed):', booksBeforeSort, 'Sorted books:', JSON.parse(JSON.stringify(books)));
       }
 
       // Apply pagination (client-side)
@@ -200,6 +211,7 @@ export const booksDataSource: DataSource<Book> = {
       const end = start + paginationModel.pageSize;
       const paginatedBooks = books.slice(start, end);
 
+      console.log('[DEBUG book.ts getMany] Paginated books to be returned:', JSON.parse(JSON.stringify(paginatedBooks)), 'Total item count:', books.length);
       return {
         items: paginatedBooks,
         itemCount: books.length,
@@ -232,15 +244,28 @@ export const booksDataSource: DataSource<Book> = {
   },
   createOne: async (data) => {
     try {
+      // Check for duplicate Accession_Number before creating
+      const accessionNumberToCheck = data.Accession_Number ? data.Accession_Number.trim() : null;
+      if (accessionNumberToCheck) {
+        const q = query(
+          booksCollectionRef,
+          where('Accession_Number', '==', accessionNumberToCheck),
+          limit(1)
+        );
+        const querySnapshot = await getDocs(q);
+        console.log(`[DEBUG book.ts] Duplicate check for Accession_Number "${accessionNumberToCheck}": Found ${querySnapshot.size} existing records.`);
+        if (!querySnapshot.empty) {
+          // Throw a user-friendly error message
+          throw new Error('A book with this Accession Number already exists.');
+        }
+      }
+
       // FIX: Remove undefined values before sending to Firestore
       const cleanedData = removeUndefined(data);
       const docRef = await addDoc(booksCollectionRef, cleanedData);
-      return {
-        id: docRef.id,
-        ...data // return original data for local cache consistency
-      } as Book;
+      const newBook = { id: docRef.id, ...cleanedData } as Book; // Use cleanedData
+      return newBook;
     } catch (error) {
-      console.error('Error creating book:', error);
       throw error;
     }
   },
@@ -271,9 +296,9 @@ export const booksDataSource: DataSource<Book> = {
   },
   validate: z.object({
     // NEW FIELD VALIDATIONS - Most are optional for flexibility
-    Accession_Number: z.string().optional().nullable(), // Added .nullable() as it can be null from forms
+    Accession_Number: z.string({ required_error: 'Accession Number is required' }).nonempty('Accession Number is required'),
     Title_Number: z.string().optional().nullable(),
-    Title: z.string().optional().nullable(),
+    Title: z.string({ required_error: 'Title is required' }).nonempty('Title is required'),
     Author: z.string().optional().nullable(),
     Author1_FirstName: z.string().optional().nullable(),
     Author2_Surname: z.string().optional().nullable(),
@@ -289,7 +314,14 @@ export const booksDataSource: DataSource<Book> = {
     Description: z.string().optional().nullable(),
     dimension: z.string().optional().nullable(),
     Accompanying_materials: z.string().optional().nullable(),
-    ISBN: z.string().optional().nullable(),
+    ISBN: z.string()
+      .optional()
+      .nullable()
+      .refine((value) => {
+        if (!value) return true; // Optional: if no value, it's valid
+        const cleanedIsbn = value.replace(/-/g, ''); // Remove all hyphens
+        return cleanedIsbn.length === 13;
+      }, { message: 'If provided, ISBN must be exactly 13 digits after removing hyphens.' }),
     Material_Type: z.string().optional().nullable(),
     Subtype: z.string().optional().nullable(),
     General_Subject: z.string().optional().nullable(),
@@ -314,4 +346,3 @@ export const booksDataSource: DataSource<Book> = {
 };
 
 export const booksCache = new DataSourceCache();
-
