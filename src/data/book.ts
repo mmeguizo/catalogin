@@ -286,6 +286,34 @@ export const booksDataSource: DataSource<Book> = {
   },
   updateOne: async (bookId, data) => {
     try {
+      // Check for duplicate Accession_Number before updating
+      const accessionNumberToCheck = data.Accession_Number ? data.Accession_Number.trim() : null;
+      if (accessionNumberToCheck) {
+        const q = query(
+          booksCollectionRef,
+          where('value.Accession_Number', '==', accessionNumberToCheck),
+          limit(2)
+        );
+        const querySnapshot = await getDocs(q);
+        
+        // If we found any books with this accession number
+        if (!querySnapshot.empty) {
+          // Check if the only match is the current book being edited
+          let isDuplicate = false;
+          querySnapshot.forEach(doc => {
+            // If we found a different book with the same accession number
+            if (doc.id !== bookId) {
+              isDuplicate = true;
+            }
+          });
+          
+          if (isDuplicate) {
+            // Throw a user-friendly error message
+            throw new Error('A book with this Accession Number already exists.');
+          }
+        }
+      }
+
       // FIX: Remove undefined values before sending to Firestore
       // The 'data' from the form is flat. We need to prepare it
       // to update the nested 'value' field in Firestore.
